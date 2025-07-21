@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connect the Dots - WebXR Mesozoic Camp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.150.1/build/three.module.js"
+    }
+  }
+  </script>
+
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #2F4F2F, #8B7D6B, #CD853F);
+    }
+    #overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1;
+    }
+    #start-button {
+      padding: 14px 28px;
+      font-size: 20px;
+      background: linear-gradient(135deg, rgba(139, 69, 19, 0.8), rgba(160, 82, 45, 0.9));
+      color: white;
+      border: none;
+      border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(139, 69, 19, 0.5);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    #start-button:hover {
+      transform: translateY(-3px) scale(1.03);
+    }
+    #status {
+      margin-top: 15px;
+      font-size: 16px;
+      background: rgba(47, 79, 47, 0.8);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 12px;
+      display: none;
+      backdrop-filter: blur(8px);
+    }
+    .webxr-hidden {
+      display: none !important;
+    }
+    .exit-ar { 
+      position: fixed; 
+      top: 20px; 
+      right: 20px; 
+      background: rgba(139, 69, 19, 0.7); 
+      color: white; 
+      border: none; 
+      border-radius: 50%; 
+      width: 50px; 
+      height: 50px; 
+      display: none; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 24px; 
+      cursor: pointer; 
+      z-index: 1000; 
+    }
+    .xr-active .exit-ar { 
+      display: flex; 
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <button id="start-button">🦕 Start Mesozoic Camp 🦕</button>
+    <div id="status"></div>
+  </div>
+  
+  <button class="exit-ar" id="exit-ar">×</button>
+  
+  <script type="module">
+    import * as THREE from 'three';
+
+    let camera, scene, renderer;
+    let controllers = [];
+    let dots = [];
+    let lines = [];
+    let connectedDots = [];
+    let currentDotIndex = 0;
+    let gameComplete = false;
+    let spawnedModels = [];
+    let xrSession = null;
+    let hoveredDot = null;
+    let currentShapeIndex = 0;
+    
+    // Mesozoic shape definitions
+    const mesozoicShapes = [
+      {
+        name: "Triceratops",
+        pattern: [
+          { x: -1.5, y: 1.8, z: -2.5, id: 0 }, // nose tip
+          { x: -1.3, y: 1.8, z: -2.5, id: 1 }, // beak
+          { x: -1.1, y: 1.9, z: -2.5, id: 2 }, // beak top
+          { x: -0.9, y: 2.1, z: -2.5, id: 3 }, // frill start
+          { x: -0.7, y: 2.2, z: -2.5, id: 4 }, // frill curve
+          { x: -0.5, y: 2.2, z: -2.5, id: 5 }, // frill top
+          { x: -0.3, y: 2.1, z: -2.5, id: 6 }, // frill curve
+          { x: -0.1, y: 1.9, z: -2.5, id: 7 }, // back start
+          { x: 0.1, y: 1.8, z: -2.5, id: 8 },  // back
+          { x: 0.3, y: 1.7, z: -2.5, id: 9 },  // back curve
+          { x: 0.4, y: 1.5, z: -2.5, id: 10 }, // tail start
+          { x: 0.5, y: 1.3, z: -2.5, id: 11 }, // tail mid
+          { x: 0.4, y: 1.1, z: -2.5, id: 12 }, // tail end
+          { x: 0.2, y: 1.0, z: -2.5, id: 13 }, // belly start
+          { x: 0.0, y: 1.0, z: -2.5, id: 14 }, // belly
+          { x: -0.3, y: 1.1, z: -2.5, id: 15 }, // belly curve
+          { x: -0.6, y: 1.3, z: -2.5, id: 16 }, // neck
+          { x: -0.9, y: 1.5, z: -2.5, id: 17 }  // neck to head
+        ],
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0]
+      },
+      {
+        name: "Pterodactyl", 
+        pattern: [
+          { x: 1.5, y: 2.5, z: -2.5, id: 0 }, // beak tip
+          { x: 1.3, y: 2.5, z: -2.5, id: 1 }, // beak base
+          { x: 1.8, y: 2.6, z: -2.5, id: 2 }, // right wing tip
+          { x: 1.6, y: 2.5, z: -2.5, id: 3 }, // right wing mid
+          { x: 1.4, y: 2.4, z: -2.5, id: 4 }, // right wing base
+          { x: 1.2, y: 2.3, z: -2.5, id: 5 }, // body
+          { x: 0.8, y: 2.6, z: -2.5, id: 6 }, // left wing tip
+          { x: 1.0, y: 2.5, z: -2.5, id: 7 }, // left wing mid
+          { x: 1.2, y: 2.4, z: -2.5, id: 8 }, // left wing base
+          { x: 1.1, y: 2.3, z: -2.5, id: 9 }, // body center
+          { x: 1.0, y: 2.1, z: -2.5, id: 10 }, // tail start
+          { x: 0.9, y: 1.9, z: -2.5, id: 11 }, // tail mid
+          { x: 0.8, y: 1.7, z: -2.5, id: 12 }, // tail end
+          { x: 0.7, y: 1.5, z: -2.5, id: 13 }  // tail spike
+        ],
+        connectionOrder: [0,1,2,3,4,5,0,6,7,8,9,0,10,11,12,13,0]
+      },
+      {
+        name: "Volcano",
+        pattern: [
+          { x: 0, y: 2.2, z: -2.5, id: 0 },   // crater rim 1
+          { x: 0.2, y: 2.2, z: -2.5, id: 1 }, // crater rim 2
+          { x: 0.3, y: 2.1, z: -2.5, id: 2 }, // crater rim 3
+          { x: 0.1, y: 2.0, z: -2.5, id: 3 }, // crater rim 4
+          { x: 0.4, y: 1.8, z: -2.5, id: 4 }, // slope 1
+          { x: 0.6, y: 1.5, z: -2.5, id: 5 }, // slope 2
+          { x: 0.7, y: 1.2, z: -2.5, id: 6 }, // slope 3
+          { x: 0.5, y: 0.9, z: -2.5, id: 7 }, // base
+          { x: 0.0, y: 0.9, z: -2.5, id: 8 }, // base center
+          { x: 0.1, y: 2.1, z: -2.5, id: 9 }  // lava pool
+        ],
+        connectionOrder: [0,1,2,3,0,4,5,6,7,8,9]
+      },
+      {
+        name: "Giant Fern",
+        pattern: [
+          { x: -1.0, y: 1.0, z: -2.5, id: 0 }, // trunk base
+          { x: -1.0, y: 1.8, z: -2.5, id: 1 }, // trunk top
+          { x: -0.7, y: 2.1, z: -2.5, id: 2 }, // frond 1 tip
+          { x: -0.8, y: 2.0, z: -2.5, id: 3 }, // frond 1 base
+          { x: -1.2, y: 2.0, z: -2.5, id: 4 }, // frond 2 tip
+          { x: -1.1, y: 1.9, z: -2.5, id: 5 }, // frond 2 base
+          { x: -0.9, y: 2.2, z: -2.5, id: 6 }, // frond 3 tip
+          { x: -1.0, y: 2.1, z: -2.5, id: 7 }, // frond 3 base
+          { x: -0.6, y: 1.9, z: -2.5, id: 8 }, // frond 4 tip
+          { x: -0.7, y: 1.8, z: -2.5, id: 9 }, // frond 4 base
+          { x: -1.3, y: 1.8, z: -2.5, id: 10 }, // frond 5 tip
+          { x: -1.2, y: 1.7, z: -2.5, id: 11 }  // frond 5 base
+        ],
+        connectionOrder: [0,1,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0]
+      },
+      {
+        name: "Dinosaur Footprint",
+        pattern: [
+          { x: 1.0, y: 1.0, z: -2.5, id: 0 }, // heel left
+          { x: 1.2, y: 1.0, z: -2.5, id: 1 }, // heel center
+          { x: 1.4, y: 1.0, z: -2.5, id: 2 }, // heel right
+          { x: 0.9, y: 1.2, z: -2.5, id: 3 }, // left toe tip
+          { x: 1.0, y: 1.15, z: -2.5, id: 4 }, // left toe mid
+          { x: 1.1, y: 1.1, z: -2.5, id: 5 }, // left toe base
+          { x: 1.3, y: 1.2, z: -2.5, id: 6 }, // right toe tip
+          { x: 1.4, y: 1.15, z: -2.5, id: 7 }, // right toe mid
+          { x: 1.5, y: 1.1, z: -2.5, id: 8 }  // right toe base
+        ],
+        connectionOrder: [0,1,2,0,3,4,5,0,6,7,8,0]
+      }
+    ];
+    
+    function updateStatus(message) {
+      const statusElement = document.getElementById('status');
+      statusElement.style.display = 'block';
+      statusElement.textContent = message;
+      console.log('Status:', message);
+      
+      setTimeout(() => { statusElement.style.display = 'none'; }, 4000);
+    }
+    
+    init();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.setClearColor(0x000000, 0);
+      document.body.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x8B7D6B, 1.5);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xFFE4B5, 1.2);
+      directionalLight.position.set(2, 3, 2);
+      scene.add(directionalLight);
+
+      document.getElementById('start-button').addEventListener('click', startARSession);
+      document.getElementById('exit-ar').addEventListener('click', endARSession);
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    async function startARSession() {
+      if (!navigator.xr) {
+        updateStatus('WebXR not supported on this device');
+        return;
+      }
+      
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (supported) {
+          const sessionInit = {
+            requiredFeatures: ['local-floor'],
+            optionalFeatures: ['unbounded', 'dom-overlay'],
+            domOverlay: { root: document.body }
+          };
+          const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+          onSessionStarted(session);
+        } else {
+          updateStatus('WebXR AR not supported');
+        }
+      } catch (error) {
+        updateStatus('Failed to start AR: ' + error.message);
+      }
+    }
+
+    async function onSessionStarted(session) {
+      xrSession = session;
+      document.getElementById('start-button').style.display = 'none';
+      document.body.classList.add('xr-active');
+      
+      let referenceSpace;
+      try {
+        referenceSpace = await session.requestReferenceSpace('unbounded');
+        updateStatus('🦕 Welcome to Mesozoic Camp! Walk around freely! 🦕');
+      } catch (error) {
+        referenceSpace = await session.requestReferenceSpace('local-floor');
+        updateStatus('🦕 Mesozoic Camp is ready! 🦕');
+      }
+      
+      renderer.xr.setReferenceSpace(referenceSpace);
+      renderer.xr.setSession(session);
+      document.getElementById('overlay').classList.add('webxr-hidden');
+
+      createCurrentShapeDots();
+      setupControllers();
+      renderer.setAnimationLoop(render);
+      session.addEventListener('end', onSessionEnd);
+
+      updateStatus(`Connect the dots to create a ${mesozoicShapes[currentShapeIndex].name}!`);
+    }
+
+    function endARSession() {
+      if (xrSession) {
+        xrSession.end();
+      }
+    }
+
+    function onSessionEnd() {
+      document.body.classList.remove('xr-active');
+      document.getElementById('overlay').classList.remove('webxr-hidden');
+      document.getElementById('start-button').style.display = 'block';
+      
+      clearScene();
+      renderer.setAnimationLoop(null);
+      xrSession = null;
+    }
+
+    function clearScene() {
+      [...dots, ...lines].forEach(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+        scene.remove(obj);
+      });
+      
+      spawnedModels.forEach(model => {
+        scene.remove(model);
+      });
+      
+      dots = [];
+      lines = [];
+      connectedDots = [];
+      spawnedModels = [];
+      currentDotIndex = 0;
+      currentShapeIndex = 0;
+      gameComplete = false;
+      hoveredDot = null;
+    }
+
+    function createCurrentShapeDots() {
+      const currentShape = mesozoicShapes[currentShapeIndex];
+      
+      currentShape.pattern.forEach(dotPos => {
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 16, 16),
+          new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.4,
+            transparent: true,
+            opacity: 0.95
+          })
+        );
+        
+        dot.position.set(dotPos.x, dotPos.y, dotPos.z);
+        dot.userData = { 
+          id: dotPos.id, 
+          originalScale: dot.scale.clone(),
+          isConnected: false 
+        };
+        
+        scene.add(dot);
+        dots.push(dot);
+      });
+
+      // Highlight first dot
+      const firstDot = dots.find(dot => dot.userData.id === currentShape.connectionOrder[0]);
+      if (firstDot) {
+        firstDot.material.color.set(0xffd700);
+        firstDot.material.emissive.set(0xffd700);
+        firstDot.scale.setScalar(1.2);
+      }
+    }
+
+    function setupControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+        controller.addEventListener('selectstart', onControllerSelect);
+        
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -1)
+        ]);
+        const material = new THREE.LineBasicMaterial({ 
+          color: 0x8B4513, 
+          opacity: 0.6, 
+          transparent: true 
+        });
+        const line = new THREE.Line(geometry, material);
+        controller.add(line);
+        
+        scene.add(controller);
+        controllers.push(controller);
+      }
+    }
+
+    function onControllerSelect(event) {
+      if (gameComplete || !hoveredDot) return;
+      
+      const currentShape = mesozoicShapes[currentShapeIndex];
+      const expectedDotId = currentShape.connectionOrder[currentDotIndex];
+      
+      if (hoveredDot.userData.id === expectedDotId) {
+        connectDot(hoveredDot);
+        currentDotIndex++;
+        
+        if (currentDotIndex >= currentShape.connectionOrder.length) {
+          completeCurrentShape();
+        } else {
+          // Highlight next dot
+          const nextDotId = currentShape.connectionOrder[currentDotIndex];
+          const nextDot = dots.find(dot => dot.userData.id === nextDotId);
+          if (nextDot) {
+            nextDot.material.color.set(0xffd700);
+            nextDot.material.emissive.set(0xffaa00);
+            nextDot.scale.setScalar(1.2);
+          }
+        }
+      } else {
+        // Wrong dot - flash red
+        const originalColor = hoveredDot.material.color.clone();
+        const originalEmissive = hoveredDot.material.emissive.clone();
+        hoveredDot.material.color.set(0xff0000);
+        hoveredDot.material.emissive.set(0xff0000);
+        setTimeout(() => {
+          hoveredDot.material.color.copy(originalColor);
+          hoveredDot.material.emissive.copy(originalEmissive);
+        }, 300);
+        updateStatus(`Wrong dot! Connect dot #${expectedDotId + 1} for the ${currentShape.name}`);
+      }
+    }
+
+    function connectDot(dot) {
+      dot.userData.isConnected = true;
+      dot.material.color.set(0x00ff00);
+      dot.material.emissive.set(0x004400);
+      dot.scale.copy(dot.userData.originalScale);
+      
+      connectedDots.push(dot);
+      
+      if (connectedDots.length > 1) {
+        const prevDot = connectedDots[connectedDots.length - 2];
+        drawLine(prevDot.position, dot.position);
+      }
+      
+      const currentShape = mesozoicShapes[currentShapeIndex];
+      updateStatus(`${connectedDots.length}/${currentShape.connectionOrder.length} dots connected!`);
+    }
+
+    function drawLine(start, end) {
+      const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+      const material = new THREE.LineBasicMaterial({
+        color: 0x8B4513,
+        linewidth: 3,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      const line = new THREE.Line(geometry, material);
+      scene.add(line);
+      lines.push(line);
+    }
+
+    function completeCurrentShape() {
+      const currentShape = mesozoicShapes[currentShapeIndex];
+      const firstDot = connectedDots[0];
+      
+      updateStatus(`🎉 ${currentShape.name} completed! 🎉`);
+      
+      // Spawn the 3D model
+      switch(currentShape.name) {
+        case "Triceratops":
+          spawnTriceratops(firstDot.position);
+          break;
+        case "Pterodactyl":
+          spawnPterodactyl(firstDot.position);
+          break;
+        case "Volcano":
+          spawnVolcano(firstDot.position);
+          break;
+        case "Giant Fern":
+          spawnGiantFern(firstDot.position);
+          break;
+        case "Dinosaur Footprint":
+          spawnFootprint(firstDot.position);
+          break;
+      }
+      
+      // Clear current shape and move to next
+      setTimeout(() => {
+        clearCurrentShape();
+        currentShapeIndex++;
+        
+        if (currentShapeIndex >= mesozoicShapes.length) {
+          completeAllShapes();
+        } else {
+          startNextShape();
+        }
+      }, 2000);
+    }
+
+    function clearCurrentShape() {
+      [...dots, ...lines].forEach(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+        scene.remove(obj);
+      });
+      dots = [];
+      lines = [];
+      connectedDots = [];
+      currentDotIndex = 0;
+      hoveredDot = null;
+    }
+
+    function startNextShape() {
+      createCurrentShapeDots();
+      const nextShape = mesozoicShapes[currentShapeIndex];
+      updateStatus(`Now create a ${nextShape.name}! Connect the dots!`);
+    }
+
+    function completeAllShapes() {
+      gameComplete = true;
+      updateStatus('🦕 Welcome to your complete Mesozoic Camp! All creatures are alive! 🦕');
+    }
+
+    // Spawn functions for each creature
+    function spawnTriceratops(anchor) {
+      const skinMat = new THREE.MeshPhysicalMaterial({ color:0x556B2F, roughness:0.9 });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), skinMat);
+      body.scale.set(1.5,0.8,0.5);
+      
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15,12,12), skinMat);
+      head.position.set(0.8,0,0);
+      
+      const frill = new THREE.Mesh(new THREE.CircleGeometry(0.25,12), skinMat);
+      frill.rotation.y = Math.PI/2;
+      frill.position.set(0.6,0.1,0);
+      
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.2,8), skinMat);
+      horn.position.set(0.95,0.1,0);
+      horn.rotation.z = -Math.PI/6;
+      
+      const horn2 = horn.clone();
+      horn2.position.set(0.95,0.05,0.1);
+      
+      const legGeo = new THREE.CylinderGeometry(0.07,0.07,0.3);
+      const legs = [ [0.4,-0.4,0.2], [0.4,-0.4,-0.2], [-0.4,-0.4,0.2], [-0.4,-0.4,-0.2] ]
+        .map(p => {
+          const l = new THREE.Mesh(legGeo, skinMat);
+          l.position.set(...p);
+          return l;
+        });
+      
+      const trike = new THREE.Group();
+      trike.add(body, head, frill, horn, horn2, ...legs);
+      trike.position.copy(anchor);
+      trike.userData.animate = (t) => {
+        trike.position.y = anchor.y + 0.1 * Math.sin(t/300);
+      };
+      
+      scene.add(trike);
+      spawnedModels.push(trike);
+    }
+
+    function spawnPterodactyl(anchor) {
+      const wingMat = new THREE.MeshPhysicalMaterial({ color:0x8B4513, roughness:0.8 });
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.1,12,12), wingMat);
+      
+      function makeWing(sign){
+        const w = new THREE.Mesh(new THREE.BoxGeometry(1,0.02,0.3), wingMat);
+        w.position.set(0.5,0,sign*0.5);
+        w.rotation.y = sign * Math.PI/12;
+        const pivot = new THREE.Object3D();
+        pivot.add(w);
+        return {wing: w, pivot};
+      }
+      
+      const rightWing = makeWing(1);
+      const leftWing = makeWing(-1);
+      
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.15,6), wingMat);
+      beak.position.set(0.2,0,0);
+      
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.3), wingMat);
+      tail.rotation.z = Math.PI/8;
+      tail.position.set(-0.2,0,0);
+      
+      const ptero = new THREE.Group();
+      ptero.add(body, rightWing.pivot, leftWing.pivot, beak, tail);
+      ptero.position.copy(anchor);
+      ptero.position.y += 0.5; // fly higher
+      
+      ptero.userData.animate = (t) => {
+        const angle = Math.sin(t/200)*0.4;
+        rightWing.pivot.rotation.z = angle;
+        leftWing.pivot.rotation.z = -angle;
+        ptero.position.y = anchor.y + 1 + 0.2*Math.sin(t/500);
+      };
+      
+      scene.add(ptero);
+      spawnedModels.push(ptero);
+    }
+
+    function spawnVolcano(anchor) {
+      const rockMat = new THREE.MeshPhysicalMaterial({ color:0x5E503F, roughness:1 });
+      const lavaMat = new THREE.MeshBasicMaterial({ color:0xFF4500, emissive:0xFF4500 });
+      
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6,1,16), rockMat);
+      const crater = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.05,16), lavaMat);
+      crater.position.y = 0.5;
+      
+      const volcano = new THREE.Group();
+      volcano.add(cone, crater);
+      volcano.position.copy(anchor);
+      volcano.userData.animate = (t) => {
+        crater.material.emissiveIntensity = 0.5 + 0.5*Math.sin(t/200);
+      };
+      
+      scene.add(volcano);
+      spawnedModels.push(volcano);
+    }
+
+    function spawnGiantFern(anchor) {
+      const barkMat = new THREE.MeshPhysicalMaterial({ color:0x8B4513 });
+      const leafMat = new THREE.MeshPhysicalMaterial({ color:0x228B22, roughness:0.7 });
+      
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.8), barkMat);
+      trunk.position.y = 0.4;
+      
+      const fronds = [...Array(5)].map((_,i) => {
+        const f = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.6,8), leafMat);
+        const angle = (i/5)*Math.PI*2;
+        f.position.set(Math.cos(angle)*0.2,0.8,Math.sin(angle)*0.2);
+        f.rotation.set(-Math.PI/2, angle, 0);
+        trunk.add(f);
+        return f;
+      });
+      
+      const fern = new THREE.Group();
+      fern.add(trunk);
+      fern.position.copy(anchor);
+      fern.userData.animate = (t) => {
+        const sway = 0.1*Math.sin(t/300);
+        fronds.forEach((f,i)=> f.rotation.y = (i/5)*Math.PI*2 + sway);
+      };
+      
+      scene.add(fern);
+      spawnedModels.push(fern);
+    }
+
+    function spawnFootprint(anchor) {
+      const stoneMat = new THREE.MeshPhysicalMaterial({ color:0x696969, roughness:1 });
+      
+      const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.02,16), stoneMat);
+      
+      const nails = [ [-0.1,0.05], [0,0.1], [0.1,0.05] ].map(p => {
+        const n = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,8), stoneMat);
+        n.rotation.x = Math.PI/2;
+        n.position.set(p[0],0.02,p[1]);
+        return n;
+      });
+      
+      const track = new THREE.Group();
+      track.add(heel, ...nails);
+      track.position.copy(anchor);
+      
+      scene.add(track);
+      spawnedModels.push(track);
+    }
+
+    function checkControllerHover() {
+      if (gameComplete) return;
+      
+      const currentShape = mesozoicShapes[currentShapeIndex];
+      const expectedDotId = currentShape.connectionOrder[currentDotIndex];
+      const candidateDots = dots.filter(dot =>
+        !dot.userData.isConnected || dot.userData.id === expectedDotId
+      );
+      
+      let newHoveredDot = null;
+      
+      controllers.forEach(controller => {
+        const raycaster = new THREE.Raycaster();
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        const intersects = raycaster.intersectObjects(candidateDots);
+        if (intersects.length > 0) {
+          newHoveredDot = intersects[0].object;
+        }
+      });
+      
+      if (hoveredDot && hoveredDot !== newHoveredDot) {
+        if (!hoveredDot.userData.isConnected) {
+          const expectedDotId = currentShape.connectionOrder[currentDotIndex];
+          if (hoveredDot.userData.id === expectedDotId) {
+            hoveredDot.scale.setScalar(1.2);
+          } else {
+            hoveredDot.scale.copy(hoveredDot.userData.originalScale);
+          }
+          hoveredDot.material.emissiveIntensity = 0.4;
+        }
+      }
+      
+      if (newHoveredDot && newHoveredDot !== hoveredDot) {
+        newHoveredDot.scale.setScalar(1.5);
+        newHoveredDot.material.emissiveIntensity = 0.8;
+      }
+      
+      hoveredDot = newHoveredDot;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function render(timestamp, frame) {
+      if (frame) {
+        checkControllerHover();
+        
+        // Animate spawned models
+        const t = performance.now();
+        spawnedModels.forEach(model => {
+          if (model.userData.animate) {
+            model.userData.animate(t);
+          }
+        });
+      }
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
