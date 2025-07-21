@@ -99,101 +99,127 @@
     let xrSession = null;
     let hoveredDot = null;
     let currentShapeIndex = 0;
+    let controllerCursors = [];
+    let modelSpawnPositions = [
+      { x: -3, z: -3 }, { x: 3, z: -3 }, { x: -3, z: 3 }, { x: 3, z: 3 }, { x: 0, z: 4 }
+    ];
     
-    // Mesozoic shape definitions
+    // Improved Mesozoic shape definitions that mirror 3D forms
     const mesozoicShapes = [
       {
         name: "Triceratops",
         pattern: [
-          { x: -1.5, y: 1.8, z: -2.5, id: 0 }, // nose tip
-          { x: -1.3, y: 1.8, z: -2.5, id: 1 }, // beak
-          { x: -1.1, y: 1.9, z: -2.5, id: 2 }, // beak top
-          { x: -0.9, y: 2.1, z: -2.5, id: 3 }, // frill start
-          { x: -0.7, y: 2.2, z: -2.5, id: 4 }, // frill curve
-          { x: -0.5, y: 2.2, z: -2.5, id: 5 }, // frill top
-          { x: -0.3, y: 2.1, z: -2.5, id: 6 }, // frill curve
-          { x: -0.1, y: 1.9, z: -2.5, id: 7 }, // back start
-          { x: 0.1, y: 1.8, z: -2.5, id: 8 },  // back
-          { x: 0.3, y: 1.7, z: -2.5, id: 9 },  // back curve
-          { x: 0.4, y: 1.5, z: -2.5, id: 10 }, // tail start
-          { x: 0.5, y: 1.3, z: -2.5, id: 11 }, // tail mid
-          { x: 0.4, y: 1.1, z: -2.5, id: 12 }, // tail end
-          { x: 0.2, y: 1.0, z: -2.5, id: 13 }, // belly start
-          { x: 0.0, y: 1.0, z: -2.5, id: 14 }, // belly
-          { x: -0.3, y: 1.1, z: -2.5, id: 15 }, // belly curve
-          { x: -0.6, y: 1.3, z: -2.5, id: 16 }, // neck
-          { x: -0.9, y: 1.5, z: -2.5, id: 17 }  // neck to head
+          { x: -1.8, y: 1.6, z: -2.5, id: 0 }, // snout tip
+          { x: -1.6, y: 1.6, z: -2.5, id: 1 }, // snout
+          { x: -1.4, y: 1.7, z: -2.5, id: 2 }, // nose bridge
+          { x: -1.2, y: 1.8, z: -2.5, id: 3 }, // head front
+          { x: -1.0, y: 1.9, z: -2.5, id: 4 }, // head top
+          { x: -0.8, y: 2.1, z: -2.5, id: 5 }, // frill left
+          { x: -0.6, y: 2.3, z: -2.5, id: 6 }, // frill top left
+          { x: -0.4, y: 2.4, z: -2.5, id: 7 }, // frill peak
+          { x: -0.2, y: 2.3, z: -2.5, id: 8 }, // frill top right
+          { x: 0.0, y: 2.1, z: -2.5, id: 9 },  // frill right
+          { x: 0.2, y: 1.9, z: -2.5, id: 10 }, // neck back
+          { x: 0.4, y: 1.7, z: -2.5, id: 11 }, // body front
+          { x: 0.6, y: 1.6, z: -2.5, id: 12 }, // body center
+          { x: 0.8, y: 1.5, z: -2.5, id: 13 }, // body back
+          { x: 1.0, y: 1.3, z: -2.5, id: 14 }, // tail start
+          { x: 1.1, y: 1.1, z: -2.5, id: 15 }, // tail tip
+          { x: 0.9, y: 1.0, z: -2.5, id: 16 }, // belly back
+          { x: 0.5, y: 1.0, z: -2.5, id: 17 }, // belly center
+          { x: 0.1, y: 1.1, z: -2.5, id: 18 }, // belly front
+          { x: -0.3, y: 1.3, z: -2.5, id: 19 }, // neck bottom
+          { x: -0.7, y: 1.5, z: -2.5, id: 20 }  // head bottom
         ],
-        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,0]
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,3,0]
       },
       {
         name: "Pterodactyl", 
         pattern: [
-          { x: 1.5, y: 2.5, z: -2.5, id: 0 }, // beak tip
-          { x: 1.3, y: 2.5, z: -2.5, id: 1 }, // beak base
-          { x: 1.8, y: 2.6, z: -2.5, id: 2 }, // right wing tip
-          { x: 1.6, y: 2.5, z: -2.5, id: 3 }, // right wing mid
-          { x: 1.4, y: 2.4, z: -2.5, id: 4 }, // right wing base
-          { x: 1.2, y: 2.3, z: -2.5, id: 5 }, // body
-          { x: 0.8, y: 2.6, z: -2.5, id: 6 }, // left wing tip
-          { x: 1.0, y: 2.5, z: -2.5, id: 7 }, // left wing mid
-          { x: 1.2, y: 2.4, z: -2.5, id: 8 }, // left wing base
-          { x: 1.1, y: 2.3, z: -2.5, id: 9 }, // body center
-          { x: 1.0, y: 2.1, z: -2.5, id: 10 }, // tail start
-          { x: 0.9, y: 1.9, z: -2.5, id: 11 }, // tail mid
-          { x: 0.8, y: 1.7, z: -2.5, id: 12 }, // tail end
-          { x: 0.7, y: 1.5, z: -2.5, id: 13 }  // tail spike
+          { x: 1.8, y: 2.3, z: -2.5, id: 0 }, // beak tip
+          { x: 1.6, y: 2.3, z: -2.5, id: 1 }, // head
+          { x: 1.4, y: 2.4, z: -2.5, id: 2 }, // body center
+          { x: 1.2, y: 2.2, z: -2.5, id: 3 }, // right wing inner
+          { x: 0.8, y: 2.1, z: -2.5, id: 4 }, // right wing mid
+          { x: 0.4, y: 2.0, z: -2.5, id: 5 }, // right wing tip
+          { x: 0.8, y: 2.1, z: -2.5, id: 6 }, // wing base right
+          { x: 1.4, y: 2.4, z: -2.5, id: 7 }, // body (return)
+          { x: 1.2, y: 2.6, z: -2.5, id: 8 }, // left wing inner
+          { x: 0.8, y: 2.7, z: -2.5, id: 9 }, // left wing mid
+          { x: 0.4, y: 2.8, z: -2.5, id: 10 }, // left wing tip
+          { x: 0.8, y: 2.7, z: -2.5, id: 11 }, // wing base left
+          { x: 1.4, y: 2.4, z: -2.5, id: 12 }, // body (return)
+          { x: 1.3, y: 2.2, z: -2.5, id: 13 }, // tail start
+          { x: 1.1, y: 2.0, z: -2.5, id: 14 }, // tail mid
+          { x: 0.9, y: 1.8, z: -2.5, id: 15 }, // tail end
+          { x: 0.8, y: 1.6, z: -2.5, id: 16 }  // tail spike
         ],
-        connectionOrder: [0,1,2,3,4,5,0,6,7,8,9,0,10,11,12,13,0]
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
       },
       {
         name: "Volcano",
         pattern: [
-          { x: 0, y: 2.2, z: -2.5, id: 0 },   // crater rim 1
-          { x: 0.2, y: 2.2, z: -2.5, id: 1 }, // crater rim 2
-          { x: 0.3, y: 2.1, z: -2.5, id: 2 }, // crater rim 3
-          { x: 0.1, y: 2.0, z: -2.5, id: 3 }, // crater rim 4
-          { x: 0.4, y: 1.8, z: -2.5, id: 4 }, // slope 1
-          { x: 0.6, y: 1.5, z: -2.5, id: 5 }, // slope 2
-          { x: 0.7, y: 1.2, z: -2.5, id: 6 }, // slope 3
-          { x: 0.5, y: 0.9, z: -2.5, id: 7 }, // base
-          { x: 0.0, y: 0.9, z: -2.5, id: 8 }, // base center
-          { x: 0.1, y: 2.1, z: -2.5, id: 9 }  // lava pool
+          { x: 0.3, y: 2.4, z: -2.5, id: 0 }, // crater rim
+          { x: 0.2, y: 2.4, z: -2.5, id: 1 }, // crater edge
+          { x: 0.1, y: 2.3, z: -2.5, id: 2 }, // crater inner
+          { x: 0.0, y: 2.3, z: -2.5, id: 3 }, // crater center
+          { x: -0.1, y: 2.3, z: -2.5, id: 4 }, // crater other side
+          { x: -0.2, y: 2.4, z: -2.5, id: 5 }, // crater edge
+          { x: -0.3, y: 2.4, z: -2.5, id: 6 }, // crater rim
+          { x: -0.5, y: 2.0, z: -2.5, id: 7 }, // slope left
+          { x: -0.7, y: 1.6, z: -2.5, id: 8 }, // slope mid left
+          { x: -0.8, y: 1.2, z: -2.5, id: 9 }, // slope lower left
+          { x: -0.6, y: 0.8, z: -2.5, id: 10 }, // base left
+          { x: 0.0, y: 0.8, z: -2.5, id: 11 }, // base center
+          { x: 0.6, y: 0.8, z: -2.5, id: 12 }, // base right
+          { x: 0.8, y: 1.2, z: -2.5, id: 13 }, // slope lower right
+          { x: 0.7, y: 1.6, z: -2.5, id: 14 }, // slope mid right
+          { x: 0.5, y: 2.0, z: -2.5, id: 15 }  // slope right
         ],
-        connectionOrder: [0,1,2,3,0,4,5,6,7,8,9]
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,0]
       },
       {
         name: "Giant Fern",
         pattern: [
-          { x: -1.0, y: 1.0, z: -2.5, id: 0 }, // trunk base
-          { x: -1.0, y: 1.8, z: -2.5, id: 1 }, // trunk top
-          { x: -0.7, y: 2.1, z: -2.5, id: 2 }, // frond 1 tip
-          { x: -0.8, y: 2.0, z: -2.5, id: 3 }, // frond 1 base
-          { x: -1.2, y: 2.0, z: -2.5, id: 4 }, // frond 2 tip
-          { x: -1.1, y: 1.9, z: -2.5, id: 5 }, // frond 2 base
-          { x: -0.9, y: 2.2, z: -2.5, id: 6 }, // frond 3 tip
-          { x: -1.0, y: 2.1, z: -2.5, id: 7 }, // frond 3 base
-          { x: -0.6, y: 1.9, z: -2.5, id: 8 }, // frond 4 tip
-          { x: -0.7, y: 1.8, z: -2.5, id: 9 }, // frond 4 base
-          { x: -1.3, y: 1.8, z: -2.5, id: 10 }, // frond 5 tip
-          { x: -1.2, y: 1.7, z: -2.5, id: 11 }  // frond 5 base
+          { x: -1.0, y: 0.8, z: -2.5, id: 0 }, // root base
+          { x: -1.0, y: 1.2, z: -2.5, id: 1 }, // trunk low
+          { x: -1.0, y: 1.6, z: -2.5, id: 2 }, // trunk mid
+          { x: -1.0, y: 2.0, z: -2.5, id: 3 }, // trunk top
+          { x: -0.7, y: 2.3, z: -2.5, id: 4 }, // frond 1 tip
+          { x: -0.8, y: 2.1, z: -2.5, id: 5 }, // frond 1 mid
+          { x: -1.0, y: 2.0, z: -2.5, id: 6 }, // trunk (return)
+          { x: -1.3, y: 2.3, z: -2.5, id: 7 }, // frond 2 tip
+          { x: -1.2, y: 2.1, z: -2.5, id: 8 }, // frond 2 mid
+          { x: -1.0, y: 2.0, z: -2.5, id: 9 }, // trunk (return)
+          { x: -0.8, y: 2.4, z: -2.5, id: 10 }, // frond 3 tip
+          { x: -0.9, y: 2.2, z: -2.5, id: 11 }, // frond 3 mid
+          { x: -1.0, y: 2.0, z: -2.5, id: 12 }, // trunk (return)
+          { x: -1.2, y: 2.4, z: -2.5, id: 13 }, // frond 4 tip
+          { x: -1.1, y: 2.2, z: -2.5, id: 14 }  // frond 4 mid
         ],
-        connectionOrder: [0,1,2,0,3,0,4,0,5,0,6,0,7,0,8,0,9,0,10,0,11,0]
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,12]
       },
       {
-        name: "Dinosaur Footprint",
+        name: "Stegosaurus",
         pattern: [
-          { x: 1.0, y: 1.0, z: -2.5, id: 0 }, // heel left
-          { x: 1.2, y: 1.0, z: -2.5, id: 1 }, // heel center
-          { x: 1.4, y: 1.0, z: -2.5, id: 2 }, // heel right
-          { x: 0.9, y: 1.2, z: -2.5, id: 3 }, // left toe tip
-          { x: 1.0, y: 1.15, z: -2.5, id: 4 }, // left toe mid
-          { x: 1.1, y: 1.1, z: -2.5, id: 5 }, // left toe base
-          { x: 1.3, y: 1.2, z: -2.5, id: 6 }, // right toe tip
-          { x: 1.4, y: 1.15, z: -2.5, id: 7 }, // right toe mid
-          { x: 1.5, y: 1.1, z: -2.5, id: 8 }  // right toe base
+          { x: 1.6, y: 1.5, z: -2.5, id: 0 }, // head
+          { x: 1.4, y: 1.6, z: -2.5, id: 1 }, // neck
+          { x: 1.2, y: 1.7, z: -2.5, id: 2 }, // body front
+          { x: 1.0, y: 1.8, z: -2.5, id: 3 }, // spike 1
+          { x: 0.8, y: 1.9, z: -2.5, id: 4 }, // spike 2
+          { x: 0.6, y: 2.0, z: -2.5, id: 5 }, // spike 3
+          { x: 0.4, y: 1.9, z: -2.5, id: 6 }, // spike 4
+          { x: 0.2, y: 1.8, z: -2.5, id: 7 }, // back
+          { x: 0.0, y: 1.7, z: -2.5, id: 8 }, // tail start
+          { x: -0.2, y: 1.6, z: -2.5, id: 9 }, // tail
+          { x: -0.4, y: 1.5, z: -2.5, id: 10 }, // tail spikes
+          { x: -0.2, y: 1.4, z: -2.5, id: 11 }, // tail bottom
+          { x: 0.2, y: 1.3, z: -2.5, id: 12 }, // belly
+          { x: 0.6, y: 1.2, z: -2.5, id: 13 }, // belly mid
+          { x: 1.0, y: 1.3, z: -2.5, id: 14 }, // belly front
+          { x: 1.2, y: 1.4, z: -2.5, id: 15 }  // neck bottom
         ],
-        connectionOrder: [0,1,2,0,3,4,5,0,6,7,8,0]
+        connectionOrder: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,1,0]
       }
     ];
     
@@ -300,7 +326,16 @@
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) obj.material.dispose();
         scene.remove(obj);
+        // Also remove hit boxes
+        if (obj.userData && obj.userData.hitBox) {
+          scene.remove(obj.userData.hitBox);
+        }
       });
+      
+      // Remove any orphaned hit boxes
+      scene.children.filter(child => 
+        child.userData && child.userData.dot && !child.visible
+      ).forEach(hitBox => scene.remove(hitBox));
       
       spawnedModels.forEach(model => {
         scene.remove(model);
@@ -310,6 +345,7 @@
       lines = [];
       connectedDots = [];
       spawnedModels = [];
+      controllerCursors = [];
       currentDotIndex = 0;
       currentShapeIndex = 0;
       gameComplete = false;
@@ -321,24 +357,42 @@
       
       currentShape.pattern.forEach(dotPos => {
         const dot = new THREE.Mesh(
-          new THREE.SphereGeometry(0.04, 16, 16),
+          new THREE.SphereGeometry(0.06, 20, 20), // Slightly larger dots
           new THREE.MeshPhysicalMaterial({
             color: 0xffffff,
             emissive: 0xffffff,
             emissiveIntensity: 0.4,
             transparent: true,
-            opacity: 0.95
+            opacity: 0.95,
+            roughness: 0.3,
+            metalness: 0.1
           })
         );
         
+        // Add invisible larger collision sphere for easier hitting
+        const hitBox = new THREE.Mesh(
+          new THREE.SphereGeometry(0.12, 8, 8), // Much larger hit area
+          new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 0,
+            visible: false
+          })
+        );
+        hitBox.position.copy(dot.position);
+        
         dot.position.set(dotPos.x, dotPos.y, dotPos.z);
+        hitBox.position.set(dotPos.x, dotPos.y, dotPos.z);
+        
         dot.userData = { 
           id: dotPos.id, 
           originalScale: dot.scale.clone(),
-          isConnected: false 
+          isConnected: false,
+          hitBox: hitBox
         };
+        hitBox.userData = { dot: dot };
         
         scene.add(dot);
+        scene.add(hitBox);
         dots.push(dot);
       });
 
@@ -347,7 +401,7 @@
       if (firstDot) {
         firstDot.material.color.set(0xffd700);
         firstDot.material.emissive.set(0xffd700);
-        firstDot.scale.setScalar(1.2);
+        firstDot.scale.setScalar(1.3);
       }
     }
 
@@ -356,6 +410,7 @@
         const controller = renderer.xr.getController(i);
         controller.addEventListener('selectstart', onControllerSelect);
         
+        // Controller ray
         const geometry = new THREE.BufferGeometry().setFromPoints([
           new THREE.Vector3(0, 0, 0),
           new THREE.Vector3(0, 0, -1)
@@ -367,6 +422,30 @@
         });
         const line = new THREE.Line(geometry, material);
         controller.add(line);
+        
+        // Add cursor/crosshair at tip of controller
+        const cursorGeometry = new THREE.RingGeometry(0.015, 0.025, 16);
+        const cursorMaterial = new THREE.MeshBasicMaterial({
+          color: 0xFFD700,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide
+        });
+        const cursor = new THREE.Mesh(cursorGeometry, cursorMaterial);
+        cursor.position.set(0, 0, -0.8);
+        controller.add(cursor);
+        controllerCursors.push(cursor);
+        
+        // Add inner dot for precision
+        const dotGeometry = new THREE.CircleGeometry(0.008, 12);
+        const dotMaterial = new THREE.MeshBasicMaterial({
+          color: 0xFF4500,
+          transparent: true,
+          opacity: 0.9
+        });
+        const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+        dot.position.set(0, 0, -0.799);
+        controller.add(dot);
         
         scene.add(controller);
         controllers.push(controller);
@@ -392,7 +471,7 @@
           if (nextDot) {
             nextDot.material.color.set(0xffd700);
             nextDot.material.emissive.set(0xffaa00);
-            nextDot.scale.setScalar(1.2);
+            nextDot.scale.setScalar(1.3);
           }
         }
       } else {
@@ -460,8 +539,8 @@
         case "Giant Fern":
           spawnGiantFern(firstDot.position);
           break;
-        case "Dinosaur Footprint":
-          spawnFootprint(firstDot.position);
+        case "Stegosaurus":
+          spawnStegosaurus(firstDot.position);
           break;
       }
       
@@ -483,7 +562,16 @@
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) obj.material.dispose();
         scene.remove(obj);
+        // Also remove hit boxes
+        if (obj.userData && obj.userData.hitBox) {
+          scene.remove(obj.userData.hitBox);
+        }
       });
+      // Remove any orphaned hit boxes
+      scene.children.filter(child => 
+        child.userData && child.userData.dot && !child.visible
+      ).forEach(hitBox => scene.remove(hitBox));
+      
       dots = [];
       lines = [];
       connectedDots = [];
@@ -502,39 +590,65 @@
       updateStatus('🦕 Welcome to your complete Mesozoic Camp! All creatures are alive! 🦕');
     }
 
-    // Spawn functions for each creature
+    // Improved spawn functions with better positioning
     function spawnTriceratops(anchor) {
-      const skinMat = new THREE.MeshPhysicalMaterial({ color:0x556B2F, roughness:0.9 });
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16), skinMat);
-      body.scale.set(1.5,0.8,0.5);
+      const spawnPos = modelSpawnPositions[currentShapeIndex];
       
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15,12,12), skinMat);
-      head.position.set(0.8,0,0);
+      const skinMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x556B2F, 
+        roughness: 0.8,
+        metalness: 0.1,
+        clearcoat: 0.2
+      });
       
-      const frill = new THREE.Mesh(new THREE.CircleGeometry(0.25,12), skinMat);
-      frill.rotation.y = Math.PI/2;
-      frill.position.set(0.6,0.1,0);
+      // Main body - more realistic proportions
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 16), skinMat);
+      body.scale.set(1.8, 0.9, 0.7);
       
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.2,8), skinMat);
-      horn.position.set(0.95,0.1,0);
-      horn.rotation.z = -Math.PI/6;
+      // Head with proper shape
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 12), skinMat);
+      head.position.set(1.0, 0.1, 0);
+      head.scale.set(1.2, 0.8, 0.9);
       
-      const horn2 = horn.clone();
-      horn2.position.set(0.95,0.05,0.1);
+      // Large frill
+      const frill = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 0.05, 16), skinMat);
+      frill.rotation.z = Math.PI/2;
+      frill.position.set(0.7, 0.2, 0);
+      frill.scale.set(1, 1.5, 1);
       
-      const legGeo = new THREE.CylinderGeometry(0.07,0.07,0.3);
-      const legs = [ [0.4,-0.4,0.2], [0.4,-0.4,-0.2], [-0.4,-0.4,0.2], [-0.4,-0.4,-0.2] ]
-        .map(p => {
-          const l = new THREE.Mesh(legGeo, skinMat);
-          l.position.set(...p);
-          return l;
-        });
+      // Three horns
+      const hornMat = new THREE.MeshPhysicalMaterial({ color: 0x8B7355, roughness: 0.6 });
+      const horn1 = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.3, 8), hornMat);
+      horn1.position.set(1.3, 0.2, 0);
+      horn1.rotation.z = -Math.PI/6;
+      
+      const horn2 = horn1.clone();
+      horn2.position.set(1.25, 0.15, 0.15);
+      const horn3 = horn1.clone();
+      horn3.position.set(1.25, 0.15, -0.15);
+      
+      // Better legs
+      const legGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.4);
+      const legs = [
+        [0.6, -0.5, 0.25], [0.6, -0.5, -0.25], 
+        [-0.4, -0.5, 0.25], [-0.4, -0.5, -0.25]
+      ].map(p => {
+        const l = new THREE.Mesh(legGeo, skinMat);
+        l.position.set(...p);
+        return l;
+      });
+      
+      // Tail
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.6, 8), skinMat);
+      tail.rotation.z = Math.PI/6;
+      tail.position.set(-0.8, -0.1, 0);
       
       const trike = new THREE.Group();
-      trike.add(body, head, frill, horn, horn2, ...legs);
-      trike.position.copy(anchor);
+      trike.add(body, head, frill, horn1, horn2, horn3, tail, ...legs);
+      trike.position.set(spawnPos.x, 1.0, spawnPos.z);
       trike.userData.animate = (t) => {
-        trike.position.y = anchor.y + 0.1 * Math.sin(t/300);
+        trike.rotation.y += 0.01;
+        trike.position.y = 1.0 + 0.05 * Math.sin(t/400);
       };
       
       scene.add(trike);
@@ -542,38 +656,90 @@
     }
 
     function spawnPterodactyl(anchor) {
-      const wingMat = new THREE.MeshPhysicalMaterial({ color:0x8B4513, roughness:0.8 });
-      const body = new THREE.Mesh(new THREE.SphereGeometry(0.1,12,12), wingMat);
+      const spawnPos = modelSpawnPositions[currentShapeIndex];
       
-      function makeWing(sign){
-        const w = new THREE.Mesh(new THREE.BoxGeometry(1,0.02,0.3), wingMat);
-        w.position.set(0.5,0,sign*0.5);
-        w.rotation.y = sign * Math.PI/12;
+      const wingMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x8B4513, 
+        roughness: 0.7,
+        metalness: 0.2,
+        clearcoat: 0.3
+      });
+      
+      // Streamlined body
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 12), wingMat);
+      body.scale.set(1.5, 0.8, 0.6);
+      
+      // Elongated head with crest
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), wingMat);
+      head.position.set(0.25, 0.05, 0);
+      head.scale.set(1.8, 0.7, 0.8);
+      
+      // Crest
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.2, 8), wingMat);
+      crest.position.set(0.15, 0.15, 0);
+      crest.rotation.x = -Math.PI/3;
+      
+      function makeDetailedWing(sign) {
+        const wingGroup = new THREE.Group();
+        
+        // Wing membrane
+        const wingGeo = new THREE.PlaneGeometry(1.2, 0.4);
+        const wingMesh = new THREE.Mesh(wingGeo, new THREE.MeshPhysicalMaterial({
+          color: 0x654321,
+          transparent: true,
+          opacity: 0.8,
+          side: THREE.DoubleSide,
+          roughness: 0.8
+        }));
+        wingMesh.position.set(0.6, 0, sign * 0.3);
+        wingMesh.rotation.y = sign * Math.PI/8;
+        
+        // Wing bones
+        const boneMat = new THREE.MeshPhysicalMaterial({ color: 0x8B7355 });
+        const bone1 = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.8), boneMat);
+        bone1.position.set(0.4, 0, sign * 0.2);
+        bone1.rotation.z = Math.PI/2;
+        
+        const bone2 = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.6), boneMat);
+        bone2.position.set(0.3, 0, sign * 0.35);
+        bone2.rotation.z = Math.PI/2;
+        
+        wingGroup.add(wingMesh, bone1, bone2);
+        
         const pivot = new THREE.Object3D();
-        pivot.add(w);
-        return {wing: w, pivot};
+        pivot.add(wingGroup);
+        return { wing: wingGroup, pivot, mesh: wingMesh };
       }
       
-      const rightWing = makeWing(1);
-      const leftWing = makeWing(-1);
+      const rightWing = makeDetailedWing(1);
+      const leftWing = makeDetailedWing(-1);
       
-      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03,0.15,6), wingMat);
-      beak.position.set(0.2,0,0);
+      // Sharp beak
+      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.2, 6), 
+        new THREE.MeshPhysicalMaterial({ color: 0x444444 }));
+      beak.position.set(0.4, 0, 0);
+      beak.rotation.z = -Math.PI/2;
       
-      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.01,0.01,0.3), wingMat);
-      tail.rotation.z = Math.PI/8;
-      tail.position.set(-0.2,0,0);
+      // Long tail with diamond end
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), wingMat);
+      tail.rotation.z = Math.PI/6;
+      tail.position.set(-0.3, -0.1, 0);
+      
+      const tailEnd = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.1, 4), wingMat);
+      tailEnd.position.set(-0.5, -0.2, 0);
+      tailEnd.rotation.z = Math.PI/6;
       
       const ptero = new THREE.Group();
-      ptero.add(body, rightWing.pivot, leftWing.pivot, beak, tail);
-      ptero.position.copy(anchor);
-      ptero.position.y += 0.5; // fly higher
+      ptero.add(body, head, crest, rightWing.pivot, leftWing.pivot, beak, tail, tailEnd);
+      ptero.position.set(spawnPos.x, 2.0, spawnPos.z); // Fly higher
       
       ptero.userData.animate = (t) => {
-        const angle = Math.sin(t/200)*0.4;
+        const flapSpeed = t / 150;
+        const angle = Math.sin(flapSpeed) * 0.6;
         rightWing.pivot.rotation.z = angle;
         leftWing.pivot.rotation.z = -angle;
-        ptero.position.y = anchor.y + 1 + 0.2*Math.sin(t/500);
+        ptero.position.y = 2.0 + 0.3 * Math.sin(t / 600);
+        ptero.rotation.y += 0.02;
       };
       
       scene.add(ptero);
@@ -581,18 +747,81 @@
     }
 
     function spawnVolcano(anchor) {
-      const rockMat = new THREE.MeshPhysicalMaterial({ color:0x5E503F, roughness:1 });
-      const lavaMat = new THREE.MeshBasicMaterial({ color:0xFF4500, emissive:0xFF4500 });
+      const spawnPos = modelSpawnPositions[currentShapeIndex];
       
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6,1,16), rockMat);
-      const crater = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.05,16), lavaMat);
-      crater.position.y = 0.5;
+      const rockMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x5E503F, 
+        roughness: 1,
+        metalness: 0
+      });
+      const lavaMat = new THREE.MeshBasicMaterial({ 
+        color: 0xFF4500, 
+        emissive: 0xFF4500,
+        emissiveIntensity: 0.8
+      });
+      
+      // Multi-layered cone for realistic shape
+      const baseCone = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.2, 16), rockMat);
+      baseCone.position.y = 0.6;
+      
+      const midCone = new THREE.Mesh(new THREE.ConeGeometry(0.6, 0.8, 16), rockMat);
+      midCone.position.y = 1.0;
+      
+      const topCone = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.4, 16), rockMat);
+      topCone.position.y = 1.3;
+      
+      // Lava crater with animation
+      const crater = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.08, 16), lavaMat);
+      crater.position.y = 1.5;
+      
+      // Lava bubbles
+      const bubbles = [];
+      for (let i = 0; i < 5; i++) {
+        const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), lavaMat.clone());
+        bubble.position.set(
+          (Math.random() - 0.5) * 0.4,
+          1.45 + Math.random() * 0.1,
+          (Math.random() - 0.5) * 0.4
+        );
+        bubbles.push(bubble);
+      }
+      
+      // Smoke particles
+      const smokeGeo = new THREE.SphereGeometry(0.05, 6, 4);
+      const smokeMat = new THREE.MeshBasicMaterial({
+        color: 0x666666,
+        transparent: true,
+        opacity: 0.3
+      });
+      const smoke = [];
+      for (let i = 0; i < 8; i++) {
+        const s = new THREE.Mesh(smokeGeo, smokeMat.clone());
+        s.position.set(
+          (Math.random() - 0.5) * 0.2,
+          1.6 + i * 0.1,
+          (Math.random() - 0.5) * 0.2
+        );
+        smoke.push(s);
+      }
       
       const volcano = new THREE.Group();
-      volcano.add(cone, crater);
-      volcano.position.copy(anchor);
+      volcano.add(baseCone, midCone, topCone, crater, ...bubbles, ...smoke);
+      volcano.position.set(spawnPos.x, 0.0, spawnPos.z);
+      
       volcano.userData.animate = (t) => {
-        crater.material.emissiveIntensity = 0.5 + 0.5*Math.sin(t/200);
+        crater.material.emissiveIntensity = 0.6 + 0.4 * Math.sin(t / 200);
+        
+        // Animate bubbles
+        bubbles.forEach((bubble, i) => {
+          bubble.position.y = 1.45 + 0.1 * Math.sin(t / 300 + i);
+          bubble.material.emissiveIntensity = 0.5 + 0.5 * Math.sin(t / 250 + i);
+        });
+        
+        // Animate smoke
+        smoke.forEach((s, i) => {
+          s.position.y = 1.6 + i * 0.1 + 0.05 * Math.sin(t / 400 + i);
+          s.material.opacity = 0.1 + 0.2 * Math.sin(t / 500 + i);
+        });
       };
       
       scene.add(volcano);
@@ -600,51 +829,207 @@
     }
 
     function spawnGiantFern(anchor) {
-      const barkMat = new THREE.MeshPhysicalMaterial({ color:0x8B4513 });
-      const leafMat = new THREE.MeshPhysicalMaterial({ color:0x228B22, roughness:0.7 });
+      const spawnPos = modelSpawnPositions[currentShapeIndex];
       
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.8), barkMat);
-      trunk.position.y = 0.4;
+      const barkMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x8B4513,
+        roughness: 0.9,
+        metalness: 0
+      });
+      const leafMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x228B22, 
+        roughness: 0.7,
+        metalness: 0,
+        transparent: true,
+        opacity: 0.9
+      });
       
-      const fronds = [...Array(5)].map((_,i) => {
-        const f = new THREE.Mesh(new THREE.ConeGeometry(0.15,0.6,8), leafMat);
-        const angle = (i/5)*Math.PI*2;
-        f.position.set(Math.cos(angle)*0.2,0.8,Math.sin(angle)*0.2);
-        f.rotation.set(-Math.PI/2, angle, 0);
-        trunk.add(f);
-        return f;
+      // Thicker, more realistic trunk
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.2), barkMat);
+      trunk.position.y = 0.6;
+      
+      // Add trunk texture with rings
+      const rings = [];
+      for (let i = 0; i < 5; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(0.06 + i * 0.005, 0.01, 4, 8),
+          barkMat
+        );
+        ring.position.y = 0.2 + i * 0.2;
+        trunk.add(ring);
+        rings.push(ring);
+      }
+      
+      // Multiple layers of fronds
+      const fronds = [];
+      const layers = [
+        { y: 1.0, count: 5, size: 0.8 },
+        { y: 1.3, count: 6, size: 1.0 },
+        { y: 1.6, count: 4, size: 0.6 }
+      ];
+      
+      layers.forEach((layer, layerIndex) => {
+        for (let i = 0; i < layer.count; i++) {
+          const angle = (i / layer.count) * Math.PI * 2 + layerIndex * 0.3;
+          
+          // Create frond with multiple segments
+          const frondGroup = new THREE.Group();
+          
+          // Main frond stem
+          const stem = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.005, 0.005, layer.size * 0.8),
+            barkMat
+          );
+          stem.position.set(0, layer.size * 0.4, 0);
+          stem.rotation.x = -Math.PI/6;
+          
+          // Leaflets along the stem
+          for (let j = 0; j < 8; j++) {
+            const leaflet = new THREE.Mesh(
+              new THREE.PlaneGeometry(0.08, 0.15),
+              leafMat
+            );
+            leaflet.position.set(
+              (j % 2 ? 0.04 : -0.04),
+              j * 0.1,
+              0
+            );
+            leaflet.rotation.z = (j % 2 ? 0.3 : -0.3);
+            stem.add(leaflet);
+          }
+          
+          frondGroup.add(stem);
+          frondGroup.position.set(
+            Math.cos(angle) * 0.1,
+            layer.y,
+            Math.sin(angle) * 0.1
+          );
+          frondGroup.rotation.y = angle;
+          frondGroup.scale.setScalar(layer.size);
+          
+          trunk.add(frondGroup);
+          fronds.push({ group: frondGroup, baseAngle: angle, layer: layerIndex });
+        }
       });
       
       const fern = new THREE.Group();
       fern.add(trunk);
-      fern.position.copy(anchor);
+      fern.position.set(spawnPos.x, 0.0, spawnPos.z);
+      
       fern.userData.animate = (t) => {
-        const sway = 0.1*Math.sin(t/300);
-        fronds.forEach((f,i)=> f.rotation.y = (i/5)*Math.PI*2 + sway);
+        const sway = 0.1 * Math.sin(t / 400);
+        const gentleSway = 0.05 * Math.sin(t / 600);
+        
+        fronds.forEach((frond, i) => {
+          frond.group.rotation.y = frond.baseAngle + sway + gentleSway * (i % 2 ? 1 : -1);
+          frond.group.rotation.x = gentleSway * 0.5;
+        });
+        
+        trunk.rotation.z = gentleSway * 0.3;
       };
       
       scene.add(fern);
       spawnedModels.push(fern);
     }
 
-    function spawnFootprint(anchor) {
-      const stoneMat = new THREE.MeshPhysicalMaterial({ color:0x696969, roughness:1 });
+    function spawnStegosaurus(anchor) {
+      const spawnPos = modelSpawnPositions[currentShapeIndex];
       
-      const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.02,16), stoneMat);
-      
-      const nails = [ [-0.1,0.05], [0,0.1], [0.1,0.05] ].map(p => {
-        const n = new THREE.Mesh(new THREE.ConeGeometry(0.05,0.1,8), stoneMat);
-        n.rotation.x = Math.PI/2;
-        n.position.set(p[0],0.02,p[1]);
-        return n;
+      const skinMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x4F7942, 
+        roughness: 0.8,
+        metalness: 0.1 
+      });
+      const spikeMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x8B7355,
+        roughness: 0.6
       });
       
-      const track = new THREE.Group();
-      track.add(heel, ...nails);
-      track.position.copy(anchor);
+      // Long, low body
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 16), skinMat);
+      body.scale.set(2.0, 0.6, 0.8);
       
-      scene.add(track);
-      spawnedModels.push(track);
+      // Small head
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), skinMat);
+      head.position.set(1.2, 0.1, 0);
+      head.scale.set(0.8, 0.6, 0.7);
+      
+      // Neck
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 0.4), skinMat);
+      neck.position.set(0.8, 0, 0);
+      neck.rotation.z = -Math.PI/6;
+      
+      // Back plates - two rows
+      const plates = [];
+      for (let i = 0; i < 6; i++) {
+        const plateHeight = 0.3 + (i === 2 || i === 3 ? 0.2 : 0); // Taller in middle
+        const plate = new THREE.Mesh(
+          new THREE.ConeGeometry(0.1, plateHeight, 4),
+          spikeMat
+        );
+        plate.position.set(
+          0.6 - i * 0.2,
+          0.3 + plateHeight/2,
+          (i % 2 ? 0.15 : -0.15)
+        );
+        plates.push(plate);
+      }
+      
+      // Thagomizer (tail spikes)
+      const tailSpikes = [];
+      for (let i = 0; i < 4; i++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.25, 6), spikeMat);
+        const angle = (i / 4) * Math.PI * 2;
+        spike.position.set(
+          -1.0 + Math.cos(angle) * 0.1,
+          0.1 + Math.sin(angle) * 0.1,
+          Math.sin(angle + Math.PI/2) * 0.1
+        );
+        spike.rotation.set(
+          Math.sin(angle) * 0.3,
+          angle,
+          Math.cos(angle) * 0.3
+        );
+        tailSpikes.push(spike);
+      }
+      
+      // Legs - short and sturdy
+      const legGeo = new THREE.CylinderGeometry(0.08, 0.12, 0.35);
+      const legs = [
+        [0.5, -0.45, 0.3], [0.5, -0.45, -0.3],   // front legs
+        [-0.3, -0.45, 0.3], [-0.3, -0.45, -0.3] // back legs
+      ].map(p => {
+        const l = new THREE.Mesh(legGeo, skinMat);
+        l.position.set(...p);
+        return l;
+      });
+      
+      // Tail
+      const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.15, 0.8), skinMat);
+      tail.position.set(-0.9, -0.1, 0);
+      tail.rotation.z = Math.PI/6;
+      
+      const stego = new THREE.Group();
+      stego.add(body, head, neck, tail, ...plates, ...tailSpikes, ...legs);
+      stego.position.set(spawnPos.x, 1.0, spawnPos.z);
+      
+      stego.userData.animate = (t) => {
+        stego.rotation.y += 0.008;
+        stego.position.y = 1.0 + 0.03 * Math.sin(t / 500);
+        
+        // Subtle plate movement
+        plates.forEach((plate, i) => {
+          plate.rotation.y = Math.sin(t / 400 + i) * 0.1;
+        });
+        
+        // Tail spike movement
+        tailSpikes.forEach((spike, i) => {
+          spike.rotation.z += 0.02;
+        });
+      };
+      
+      scene.add(stego);
+      spawnedModels.push(stego);
     }
 
     function checkControllerHover() {
@@ -652,13 +1037,16 @@
       
       const currentShape = mesozoicShapes[currentShapeIndex];
       const expectedDotId = currentShape.connectionOrder[currentDotIndex];
-      const candidateDots = dots.filter(dot =>
-        !dot.userData.isConnected || dot.userData.id === expectedDotId
-      );
+      
+      // Get all hit boxes for easier targeting
+      const candidateHitBoxes = dots
+        .filter(dot => !dot.userData.isConnected || dot.userData.id === expectedDotId)
+        .map(dot => dot.userData.hitBox);
       
       let newHoveredDot = null;
+      let closestDistance = Infinity;
       
-      controllers.forEach(controller => {
+      controllers.forEach((controller, index) => {
         const raycaster = new THREE.Raycaster();
         const tempMatrix = new THREE.Matrix4();
         tempMatrix.identity().extractRotation(controller.matrixWorld);
@@ -666,17 +1054,39 @@
         raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
         raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
         
-        const intersects = raycaster.intersectObjects(candidateDots);
+        // Update cursor color based on targeting
+        const cursor = controllerCursors[index];
+        if (cursor) {
+          cursor.material.color.set(0xFFD700); // Default gold
+        }
+        
+        const intersects = raycaster.intersectObjects(candidateHitBoxes);
         if (intersects.length > 0) {
-          newHoveredDot = intersects[0].object;
+          const intersectedDot = intersects[0].object.userData.dot;
+          const distance = intersects[0].distance;
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            newHoveredDot = intersectedDot;
+            
+            // Update cursor to show successful targeting
+            if (cursor) {
+              if (intersectedDot.userData.id === expectedDotId) {
+                cursor.material.color.set(0x00FF00); // Green for correct dot
+              } else {
+                cursor.material.color.set(0xFFAA00); // Orange for wrong dot
+              }
+            }
+          }
         }
       });
       
+      // Reset previous hovered dot
       if (hoveredDot && hoveredDot !== newHoveredDot) {
         if (!hoveredDot.userData.isConnected) {
           const expectedDotId = currentShape.connectionOrder[currentDotIndex];
           if (hoveredDot.userData.id === expectedDotId) {
-            hoveredDot.scale.setScalar(1.2);
+            hoveredDot.scale.setScalar(1.3);
           } else {
             hoveredDot.scale.copy(hoveredDot.userData.originalScale);
           }
@@ -684,9 +1094,14 @@
         }
       }
       
+      // Update new hovered dot
       if (newHoveredDot && newHoveredDot !== hoveredDot) {
-        newHoveredDot.scale.setScalar(1.5);
-        newHoveredDot.material.emissiveIntensity = 0.8;
+        newHoveredDot.scale.setScalar(1.8); // Much more dramatic scale
+        newHoveredDot.material.emissiveIntensity = 1.2;
+        
+        // Add pulsing effect
+        const pulseScale = 1.8 + 0.3 * Math.sin(performance.now() / 200);
+        newHoveredDot.scale.setScalar(pulseScale);
       }
       
       hoveredDot = newHoveredDot;
