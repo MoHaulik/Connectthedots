@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Connect the Dots - WebXR Christmas Tree</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.150.1/build/three.module.js"
+    }
+  }
+  </script>
+
+  <style>
+    body { 
+      margin: 0; 
+      overflow: hidden;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f1419, #1a2332, #2d4a5c);
+    }
+    #overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1;
+    }
+    #start-button {
+      padding: 14px 28px;
+      font-size: 20px;
+      background: linear-gradient(135deg, rgba(34, 139, 34, 0.8), rgba(0, 100, 0, 0.9));
+      color: white;
+      border: none;
+      border-radius: 30px;
+      box-shadow: 0 4px 15px rgba(34, 139, 34, 0.5);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    #start-button:hover {
+      transform: translateY(-3px) scale(1.03);
+    }
+    #status {
+      margin-top: 15px;
+      font-size: 16px;
+      background: rgba(10, 20, 30, 0.6);
+      color: white;
+      padding: 12px 18px;
+      border-radius: 12px;
+      display: none;
+      backdrop-filter: blur(8px);
+    }
+    .webxr-hidden {
+      display: none !important;
+    }
+    .exit-ar { 
+      position: fixed; 
+      top: 20px; 
+      right: 20px; 
+      background: rgba(255, 255, 255, 0.25); 
+      color: white; 
+      border: none; 
+      border-radius: 50%; 
+      width: 50px; 
+      height: 50px; 
+      display: none; 
+      align-items: center; 
+      justify-content: center; 
+      font-size: 24px; 
+      cursor: pointer; 
+      z-index: 1000; 
+    }
+    .xr-active .exit-ar { 
+      display: flex; 
+    }
+  </style>
+</head>
+<body>
+  <div id="overlay">
+    <button id="start-button">Start Connect the Dots</button>
+    <div id="status"></div>
+  </div>
+  
+  <button class="exit-ar" id="exit-ar">×</button>
+  
+  <script type="module">
+    import * as THREE from 'three';
+
+    let camera, scene, renderer;
+    let controllers = [];
+    let dots = [];
+    let lines = [];
+    let connectedDots = [];
+    let currentDotIndex = 0;
+    let gameComplete = false;
+    let christmasTree = null;
+    let xrSession = null;
+    let hoveredDot = null;
+    
+    // Raised Christmas tree pattern - comfortable VR height and distance
+    const treePattern = [
+      { x: 0, y: 2.2, z: -2.5, id: 0 },      // Star at top
+      { x: -0.2, y: 2.0, z: -2.5, id: 1 },   // Top triangle
+      { x: 0.2, y: 2.0, z: -2.5, id: 2 },
+      { x: 0, y: 1.8, z: -2.5, id: 3 },
+      { x: -0.3, y: 1.7, z: -2.5, id: 4 },     // Middle triangle  
+      { x: 0.3, y: 1.7, z: -2.5, id: 5 },
+      { x: 0, y: 1.5, z: -2.5, id: 6 },
+      { x: -0.4, y: 1.4, z: -2.5, id: 7 },  // Bottom triangle
+      { x: 0.4, y: 1.4, z: -2.5, id: 8 },
+      { x: 0, y: 1.2, z: -2.5, id: 9 },
+      { x: -0.1, y: 1.1, z: -2.5, id: 10 }, // Trunk
+      { x: 0.1, y: 1.1, z: -2.5, id: 11 },
+      { x: 0.1, y: 0.9, z: -2.5, id: 12 },
+      { x: -0.1, y: 0.9, z: -2.5, id: 13 }
+    ];
+    
+    // Connection order to draw complete tree outline
+    const connectionOrder = [0, 1, 3, 2, 0, 4, 6, 5, 4, 7, 9, 8, 7, 10, 13, 12, 11, 10];
+    
+    function updateStatus(message) {
+      const statusElement = document.getElementById('status');
+      statusElement.style.display = 'block';
+      statusElement.textContent = message;
+      console.log('Status:', message);
+      
+      setTimeout(() => { statusElement.style.display = 'none'; }, 3000);
+    }
+    
+    init();
+
+    function init() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.xr.enabled = true;
+      renderer.setClearColor(0x000000, 0);
+      document.body.appendChild(renderer.domElement);
+
+      // Enhanced lighting for better visibility
+      const ambientLight = new THREE.AmbientLight(0x404040, 2);
+      scene.add(ambientLight);
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      directionalLight.position.set(2, 3, 2);
+      scene.add(directionalLight);
+
+      document.getElementById('start-button').addEventListener('click', startARSession);
+      document.getElementById('exit-ar').addEventListener('click', endARSession);
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    async function startARSession() {
+      if (!navigator.xr) {
+        updateStatus('WebXR not supported on this device');
+        return;
+      }
+      
+      try {
+        const supported = await navigator.xr.isSessionSupported('immersive-ar');
+        if (supported) {
+          const sessionInit = {
+            requiredFeatures: ['local-floor'],
+            optionalFeatures: ['unbounded', 'dom-overlay'],
+            domOverlay: { root: document.body }
+          };
+          const session = await navigator.xr.requestSession('immersive-ar', sessionInit);
+          onSessionStarted(session);
+        } else {
+          updateStatus('WebXR AR not supported');
+        }
+      } catch (error) {
+        updateStatus('Failed to start AR: ' + error.message);
+      }
+    }
+
+    async function onSessionStarted(session) {
+      xrSession = session;
+      document.getElementById('start-button').style.display = 'none';
+      document.body.classList.add('xr-active');
+      
+      // Try unbounded for boundless AR
+      let referenceSpace;
+      try {
+        referenceSpace = await session.requestReferenceSpace('unbounded');
+        updateStatus('Boundless AR active! Walk freely!');
+      } catch (error) {
+        referenceSpace = await session.requestReferenceSpace('local-floor');
+        updateStatus('AR active with floor tracking');
+      }
+      
+      renderer.xr.setReferenceSpace(referenceSpace);
+      renderer.xr.setSession(session);
+      document.getElementById('overlay').classList.add('webxr-hidden');
+
+      createDots();
+      setupControllers();
+      renderer.setAnimationLoop(render);
+      session.addEventListener('end', onSessionEnd);
+
+      updateStatus('Point at dots in order and squeeze trigger to connect! Start with the star!');
+    }
+
+    function endARSession() {
+      if (xrSession) {
+        xrSession.end();
+      }
+    }
+
+    function onSessionEnd() {
+      document.body.classList.remove('xr-active');
+      document.getElementById('overlay').classList.remove('webxr-hidden');
+      document.getElementById('start-button').style.display = 'block';
+      
+      clearScene();
+      renderer.setAnimationLoop(null);
+      xrSession = null;
+    }
+
+    function clearScene() {
+      // Clean up everything
+      [...dots, ...lines].forEach(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) obj.material.dispose();
+        scene.remove(obj);
+      });
+      
+      if (christmasTree) {
+        scene.remove(christmasTree);
+        christmasTree = null;
+      }
+      
+      dots = [];
+      lines = [];
+      connectedDots = [];
+      currentDotIndex = 0;
+      gameComplete = false;
+      hoveredDot = null;
+    }
+
+    function createDots() {
+      treePattern.forEach(dotPos => {
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 16, 16),
+          new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            emissive: 0xffffff,
+            emissiveIntensity: 0.4,
+            transparent: true,
+            opacity: 0.95
+          })
+        );
+        
+        dot.position.set(dotPos.x, dotPos.y, dotPos.z);
+        dot.userData = { 
+          id: dotPos.id, 
+          originalScale: dot.scale.clone(),
+          isConnected: false 
+        };
+        
+        scene.add(dot);
+        dots.push(dot);
+      });
+
+      // Highlight the first dot (star)
+      const firstDot = dots.find(dot => dot.userData.id === connectionOrder[0]);
+      if (firstDot) {
+        firstDot.material.color.set(0xffd700);
+        firstDot.material.emissive.set(0xffd700);
+        firstDot.scale.setScalar(1.2);
+      }
+    }
+
+    function setupControllers() {
+      for (let i = 0; i < 2; i++) {
+        const controller = renderer.xr.getController(i);
+        controller.addEventListener('selectstart', onControllerSelect);
+        
+        // Add visual ray for better targeting
+        const geometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(0, 0, -1)
+        ]);
+        const material = new THREE.LineBasicMaterial({ 
+          color: 0x00ff88, 
+          opacity: 0.5, 
+          transparent: true 
+        });
+        const line = new THREE.Line(geometry, material);
+        controller.add(line);
+        
+        scene.add(controller);
+        controllers.push(controller);
+      }
+    }
+
+    function onControllerSelect(event) {
+      if (gameComplete || !hoveredDot) return;
+      
+      const expectedDotId = connectionOrder[currentDotIndex];
+      
+      if (hoveredDot.userData.id === expectedDotId) {
+        // Correct dot!
+        connectDot(hoveredDot);
+        currentDotIndex++;
+        
+        if (currentDotIndex >= connectionOrder.length) {
+          completeGame();
+        } else {
+          // Highlight next dot
+          const nextDotId = connectionOrder[currentDotIndex];
+          const nextDot = dots.find(dot => dot.userData.id === nextDotId);
+          if (nextDot) {
+            nextDot.material.color.set(0xffd700);
+            nextDot.material.emissive.set(0xffaa00);
+            nextDot.scale.setScalar(1.2);
+          }
+        }
+      } else {
+        // Wrong dot - flash red
+        const originalColor = hoveredDot.material.color.clone();
+        const originalEmissive = hoveredDot.material.emissive.clone();
+        hoveredDot.material.color.set(0xff0000);
+        hoveredDot.material.emissive.set(0xff0000);
+        setTimeout(() => {
+          hoveredDot.material.color.copy(originalColor);
+          hoveredDot.material.emissive.copy(originalEmissive);
+        }, 300);
+        updateStatus(`Wrong dot! Look for dot #${expectedDotId + 1}`);
+      }
+    }
+
+    function connectDot(dot) {
+      // Mark as connected and change color
+      dot.userData.isConnected = true;
+      dot.material.color.set(0x00ff00);
+      dot.material.emissive.set(0x004400);
+      dot.scale.copy(dot.userData.originalScale);
+      
+      connectedDots.push(dot);
+      
+      // Draw line to previous dot if exists
+      if (connectedDots.length > 1) {
+        const prevDot = connectedDots[connectedDots.length - 2];
+        drawLine(prevDot.position, dot.position);
+      }
+      
+      updateStatus(`Connected ${connectedDots.length}/${connectionOrder.length} dots - Great job!`);
+    }
+
+    function drawLine(start, end) {
+      const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+      const material = new THREE.LineBasicMaterial({
+        color: 0x00ff88,
+        linewidth: 4,
+        transparent: true,
+        opacity: 0.8
+      });
+      
+      const line = new THREE.Line(geometry, material);
+      scene.add(line);
+      lines.push(line);
+    }
+
+    function completeGame() {
+      gameComplete = true;
+      updateStatus('🎄 Amazing! You completed the Christmas tree! 🎄');
+      createChristmasTree();
+      
+      // Add celebratory effects
+      setTimeout(() => {
+        updateStatus('🌟 Merry Christmas! 🌟');
+      }, 2000);
+    }
+
+    function createChristmasTree() {
+      christmasTree = new THREE.Group();
+      
+      // Tree body with better materials
+      const treeGeometry = new THREE.ConeGeometry(0.25, 0.5, 8);
+      const treeMaterial = new THREE.MeshPhysicalMaterial({ 
+        color: 0x228B22,
+        roughness: 0.8,
+        metalness: 0.1
+      });
+      const tree = new THREE.Mesh(treeGeometry, treeMaterial);
+      tree.position.y = 1.45;
+      christmasTree.add(tree);
+      
+      // Trunk
+      const trunkGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.2);
+      const trunkMaterial = new THREE.MeshPhysicalMaterial({ color: 0x8B4513 });
+      const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+      trunk.position.y = 1.1;
+      christmasTree.add(trunk);
+      
+      // Star on top with glow
+      const starGeometry = new THREE.ConeGeometry(0.06, 0.12, 5);
+      const starMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xFFD700,
+        emissive: 0xFFD700,
+        emissiveIntensity: 0.8 
+      });
+      const star = new THREE.Mesh(starGeometry, starMaterial);
+      star.position.y = 1.75;
+      christmasTree.add(star);
+      
+      // Add some ornaments
+      for (let i = 0; i < 6; i++) {
+        const ornament = new THREE.Mesh(
+          new THREE.SphereGeometry(0.02, 8, 8),
+          new THREE.MeshBasicMaterial({ 
+            color: i % 2 === 0 ? 0xff0000 : 0x0000ff,
+            emissive: i % 2 === 0 ? 0x440000 : 0x000044,
+            emissiveIntensity: 0.3
+          })
+        );
+        const angle = (i / 6) * Math.PI * 2;
+        ornament.position.set(
+          Math.cos(angle) * 0.15,
+          1.4 + Math.sin(i) * 0.1,
+          -2.5 + Math.sin(angle) * 0.15
+        );
+        christmasTree.add(ornament);
+      }
+      
+      christmasTree.position.set(0, 0, 0);
+      scene.add(christmasTree);
+    }
+
+    function checkControllerHover() {
+      if (gameComplete) return;
+      
+      const expectedDotId = connectionOrder[currentDotIndex];
+      // Allow either unconnected dots, or the one that must be reconnected
+      const candidateDots = dots.filter(dot =>
+        !dot.userData.isConnected || dot.userData.id === expectedDotId
+      );
+      
+      let newHoveredDot = null;
+      
+      controllers.forEach(controller => {
+        const raycaster = new THREE.Raycaster();
+        const tempMatrix = new THREE.Matrix4();
+        tempMatrix.identity().extractRotation(controller.matrixWorld);
+        
+        raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+        raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+        
+        const intersects = raycaster.intersectObjects(candidateDots);
+        if (intersects.length > 0) {
+          newHoveredDot = intersects[0].object;
+        }
+      });
+      
+      // Update hover effects
+      if (hoveredDot && hoveredDot !== newHoveredDot) {
+        // Remove hover from previous dot
+        if (!hoveredDot.userData.isConnected) {
+          const expectedDotId = connectionOrder[currentDotIndex];
+          if (hoveredDot.userData.id === expectedDotId) {
+            hoveredDot.scale.setScalar(1.2); // Keep next dot highlighted
+          } else {
+            hoveredDot.scale.copy(hoveredDot.userData.originalScale);
+          }
+          hoveredDot.material.emissiveIntensity = 0.4;
+        }
+      }
+      
+      if (newHoveredDot && newHoveredDot !== hoveredDot) {
+        // Add hover to new dot
+        newHoveredDot.scale.setScalar(1.5);
+        newHoveredDot.material.emissiveIntensity = 0.8;
+      }
+      
+      hoveredDot = newHoveredDot;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function render(timestamp, frame) {
+      if (frame) {
+        checkControllerHover();
+      }
+      renderer.render(scene, camera);
+    }
+  </script>
+</body>
+</html>
